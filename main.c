@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 int main()
 {   
@@ -69,13 +70,52 @@ int main()
             fclose(activity);
             break;
 
-        case 2:
+        case 2: 
+            char searchName[100];
+            char line[256];
+            int found = 0;
+
+            printf("\nกรอกชื่อผู้เข้าร่วมกิจกรรมที่ต้องการค้นหา: ");
+            scanf("%s", searchName);
+
+            activity = fopen("activity.csv", "r");
+            if (activity == NULL) {
+                printf("ไม่สามารถเปิดไฟล์ได้\n");
+                break;
+            }
+
+            printf("\n----------ผลลัพธ์การค้นหา----------\n");
+
+            fgets(line, sizeof(line), activity);
+            printf("%s", line);  
+
+            while (fgets(line, sizeof(line), activity)) {
+                char *NameColumn = strtok(line, ",");       
+                char *ActivityColumn = strtok(NULL, ",");   
+                char *DateColumn = strtok(NULL, ",");       
+                char *TimeColumn = strtok(NULL, ",");       
+
+                if (NameColumn != NULL && strcmp(NameColumn, searchName) == 0) {
+                    printf("%s,%s,%s,%s\n", NameColumn, ActivityColumn, DateColumn, TimeColumn);
+                    found = 1;
+                }
+            }
+
+            if (!found) {
+                printf("ไม่พบข้อมูลของชื่อ %s\n", searchName);
+            }
+
+            fclose(activity);
+            break;
+        
+
+
         case 3:
         case 4:
         case 5:
             printf("ฟีเจอร์ยังไม่พร้อมใช้งาน\n");
             break;
-
+            
         default:
             printf("ตอบให้ตรงคำถาม เลือกอีกที\n");
             break;
