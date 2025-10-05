@@ -1,280 +1,286 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
-int main()
-{   
-    int Choice;
-    char Name[100], Activity[100];
-    int Day, Month, Year; 
-    int Hour, Minute;
-    char data[256], line[256];
-    char *NameColumn, *ActivityColumn, *DateColumn, *TimeColumn;
-    char searchName[100], deleteName[100];
-    int searchChoice;
-    char searchText[100];
-    int found = 0;
-    int updated = 0;
-    int deleted = 0;
-    char confirm;
+#define FILE_NAME "activity.csv"
 
-    FILE *activity;
+// ฟังก์ชันตรวจสอบจำนวนวันของเดือน
+int getMaxDays(int month) {
+    if (month == 2) return 29;
+    else if (month == 4 || month == 6 || month == 9 || month == 11) return 30;
+    else return 31;
+}
 
-    //เช็คCSV
-    activity = fopen("activity.csv", "r");
-    if (activity == NULL) {
+// อ่าน ID ล่าสุดจากไฟล์
+int getLastID() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    if (fp == NULL) return 0;
 
-        activity = fopen("activity.csv", "w");
-        if (activity == NULL) {
-            printf("ไม่สามารถสร้างไฟล์ได้\n");
-            return 1;
+    char line[256];
+    int lastID = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        int id;
+        if (sscanf(line, "%d,", &id) == 1) {
+            if (id > lastID) lastID = id;
         }
-        fprintf(activity, "ชื่อผู้เข้าร่วม,ชื่อกิจกรรม,วันที่เข้าร่วม,เวลา\n");
-        fclose(activity);
-    } 
-    else {
-        fclose(activity);
     }
-    //MENU
-    while (1) {   
-        printf("\n----------ระบบจัดการข้อมูลผู้เข้าร่วมกิจกรรม----------\n");
-        printf("[1] เพิ่มข้อมูลการเข้าร่วมกิจกรรม\n");
-        printf("[2] ค้นหาข้อมูลการเข้าร่วมกิจกรรม\n");
-        printf("[3] แก้ไขข้อมูลการเข้าร่วมกิจกรรม\n");
-        printf("[4] ลบข้อมูลการเข้าร่วมกิจกรรม\n");    
-        printf("[5] ออกจากระบบจัดการข้อมูลผู้เข้าร่วมกิจกรรม\n");
-        do {
-            printf("เลือกเมนู (1-5): ");
-            if (scanf("%d", &Choice) != 1) {
 
-                printf("บอกให้เลือก1-5!\n");
+    fclose(fp);
+    return lastID;
+}
 
-                while (getchar() != '\n');
-                Choice = 0; 
-            } else if (Choice < 1 || Choice > 5) {
-                printf("ไม่ใช่เลือกอีกรอบบ!! (1-5)\n");
-            }
-        } while (Choice < 1 || Choice > 5);
+// แสดงข้อมูลทั้งหมด
+void viewAll() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    char line[256];
+    if (fp == NULL) {
+        printf("ไม่พบไฟล์ข้อมูล!\n");
+        return;
+    }
+    printf("\n---- ข้อมูลทั้งหมด ----\n");
+    while (fgets(line, sizeof(line), fp)) {
+        printf("%s", line);
+    }
+    fclose(fp);
+}
 
-        if (Choice == 5) {  
-            printf("ออกจากโปรแกรมเรียบร้อย!\n");
-            break;  
+// เพิ่มข้อมูลใหม่
+void addRecord() {
+    FILE *fp = fopen(FILE_NAME, "a");
+    char name[100], activity[100];
+    int day, month, year, hour, minute;
+
+    if (fp == NULL) {
+        printf("ไม่สามารถเปิดไฟล์ได้\n");
+        return;
+    }
+
+    int newID = getLastID() + 1;
+
+    printf("ชื่อผู้เข้าร่วม: ");
+    scanf(" %[^\n]", name);
+    printf("ชื่อกิจกรรม: ");
+    scanf(" %[^\n]", activity);
+
+    do {
+        printf("เดือน (1-12): ");
+        scanf("%d", &month);
+        if (month < 1 || month > 12)
+            printf("เดือนต้องอยู่ระหว่าง 1 ถึง 12!\n");
+    } while (month < 1 || month > 12);
+
+    int maxDay = getMaxDays(month);
+    do {
+        printf("วัน (1-%d): ", maxDay);
+        scanf("%d", &day);
+        if (day < 1 || day > maxDay)
+            printf("วันต้องอยู่ระหว่าง 1 ถึง %d!\n", maxDay);
+    } while (day < 1 || day > maxDay);
+
+    printf("ปี: ");
+    scanf("%d", &year);
+    printf("เวลา (ชั่วโมง นาที): ");
+    scanf("%d %d", &hour, &minute);
+
+    fprintf(fp, "%d,%s,%s,%02d/%02d/%04d,%02d:%02d\n",
+            newID, name, activity, day, month, year, hour, minute);
+
+    fclose(fp);
+    printf("เพิ่มข้อมูลเรียบร้อย! (ID = %d)\n", newID);
+}
+
+// ค้นหาข้อมูล
+void searchRecord() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    char line[256], keyword[100];
+    if (fp == NULL) {
+        printf("ไม่พบไฟล์ข้อมูล!\n");
+        return;
+    }
+
+    printf("กรอกคำค้นหา (ชื่อหรือกิจกรรม): ");
+    scanf(" %[^\n]", keyword);
+
+    printf("\n---- ผลการค้นหา ----\n");
+    int found = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, keyword)) {
+            printf("%s", line);
+            found = 1;
         }
+    }
 
-        switch (Choice) {
-    // ADD
-        case 1:
-            printf("\nชื่อผู้เข้าร่วมกิจกรรม: ");
-            scanf(" %[^\n]", Name);   
-            printf("ชื่อกิจกรรม: ");
-            scanf(" %[^\n]", Activity);   
-            printf("วัน/เดือน/ปี (เช่น 10 12 2021): ");
-            scanf("%d %d %d", &Day, &Month, &Year);
-            printf("เวลา (ชั่วโมง นาที เช่น 10 30): ");
-            scanf("%d %d", &Hour, &Minute);
+    if (!found)
+        printf("ไม่พบข้อมูลที่ตรงกับ \"%s\"\n", keyword);
 
-            activity = fopen("activity.csv", "a");
-            if (activity == NULL) {
-                printf("ไม่สามารถเปิดไฟล์ได้\n");
-                return 1;
-            }
-            fprintf(activity, "%s,%s,%02d/%02d/%04d,%02d:%02d\n",
-                    Name, Activity, Day, Month, Year, Hour, Minute);
-            fclose(activity);
+    fclose(fp);
+}
 
-            printf("เพิ่มข้อมูลเรียบร้อย!\n");
-        //เเสดงข้อมูลในCSV
-        activity = fopen("activity.csv", "r");
-            if (activity == NULL) {
-               printf("ไม่สามารถอ่านไฟล์ได้\n");
-                return 1;
-            }
-            printf("\n----------รายละเอียดกิจกรรม----------\n");
-            while (fgets(data, sizeof(data), activity)) {
-                printf("%s", data);
-            }
-            fclose(activity);
-            
-            break;
+// แก้ไขข้อมูล
+void updateRecord() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    FILE *temp = fopen("temp.csv", "w");
+    char line[256], id[10], keyword[100];
+    int found = 0;
 
-    // SEARCH
-        case 2: 
-            do {
-                printf("\n---- ค้นหาข้อมูลการเข้าร่วมกิจกรรม ----\n");
-                printf("[1] ค้นหาด้วยชื่อ\n");
-                printf("[2] ค้นหาด้วยกิจกรรม\n");
-                printf("เลือกเมนูค้นหา (1-2): ");
-                if (scanf("%d", &searchChoice) != 1) {
-                    printf("บอกให้เลือก 1-2!\n");
-                    while (getchar() != '\n');  
-                    searchChoice = 0;           
-                } else if (searchChoice < 1 || searchChoice > 2) {
-                    printf("ไม่ใช่! เลือกใหม่ (1-2)\n");
-                }
-            } while (searchChoice < 1 || searchChoice > 2);
+    if (fp == NULL || temp == NULL) {
+        printf("ไม่สามารถเปิดไฟล์ได้\n");
+        return;
+    }
 
-            printf("กรอกคำค้นหา: ");
-            scanf(" %[^\n]", searchText);   
+    printf("กรอกคำค้นหา (ชื่อหรือกิจกรรม): ");
+    scanf(" %[^\n]", keyword);
 
-            activity = fopen("activity.csv", "r");
-            if (activity == NULL) {
-                printf("ไม่สามารถเปิดไฟล์ได้\n");
-                break;
-            }
-
-            fgets(line, sizeof(line), activity); 
-            printf("\n---------- ผลลัพธ์การค้นหา ----------\n");
-
-            found = 0;
-            while (fgets(line, sizeof(line), activity)) {
-                line[strcspn(line, "\n")] = 0; 
-
-                NameColumn     = strtok(line, ",");
-                ActivityColumn = strtok(NULL, ",");
-                DateColumn     = strtok(NULL, ",");
-                TimeColumn     = strtok(NULL, ",");
-
-                int match = 0;
-                switch (searchChoice) {
-                    case 1: 
-                        if (NameColumn && strcmp(NameColumn, searchText) == 0) match = 1;
-                        break;
-                    case 2: 
-                        if (ActivityColumn && strcmp(ActivityColumn, searchText) == 0) match = 1;
-                        break;
-                }
-
-                if (match) {
-                    printf("%s,%s,%s,%s\n", NameColumn, ActivityColumn, DateColumn, TimeColumn);
-                    found = 1;
-                }
-            }
-
-            if (!found) {
-                printf("ไม่พบข้อมูลที่ค้นหา \"%s\"\n", searchText);
-            }
-
-            fclose(activity);
-            break;
-
-    // UPDATE        
-        case 3:
-            printf("\n---- แก้ไขข้อมูลการเข้าร่วมกิจกรรม ----\n");
-            printf("กรอกชื่อผู้เข้าร่วมที่ต้องการแก้ไข: ");
-            scanf(" %[^\n]", searchName);   
-
-            FILE *temp = fopen("temp.csv", "w");
-            activity = fopen("activity.csv", "r");
-
-            if (activity == NULL || temp == NULL) {
-                printf("ไม่สามารถเปิดไฟล์ได้\n");
-                break;
-            }
-
-            if (fgets(line, sizeof(line), activity)) {
-                fprintf(temp, "%s", line);
-            }
-
-            updated = 0;
-            while (fgets(line, sizeof(line), activity)) {
-                line[strcspn(line, "\n")] = 0; 
-
-                NameColumn     = strtok(line, ",");
-                ActivityColumn = strtok(NULL, ",");
-                DateColumn     = strtok(NULL, ",");
-                TimeColumn     = strtok(NULL, ",");
-
-                if (NameColumn && strcmp(NameColumn, searchName) == 0) {
-                    printf("\nข้อมูลเดิม: %s,%s,%s,%s\n",
-                        NameColumn, ActivityColumn, DateColumn, TimeColumn);
-                    printf("ชื่อใหม่: ");
-                    scanf(" %[^\n]", Name);   
-                    printf("กิจกรรมใหม่: ");
-                    scanf(" %[^\n]", Activity);   
-                    printf("วัน/เดือน/ปี ใหม่ (เช่น 10 12 2021): ");
-                    scanf("%d %d %d", &Day, &Month, &Year);
-                    printf("เวลาใหม่ (ชั่วโมง นาที เช่น 10 30): ");
-                    scanf("%d %d", &Hour, &Minute);
-
-                    fprintf(temp, "%s,%s,%02d/%02d/%04d,%02d:%02d\n",
-                            Name, Activity, Day, Month, Year, Hour, Minute);
-                    updated = 1;
-                } else {
-                    fprintf(temp, "%s,%s,%s,%s\n",
-                            NameColumn, ActivityColumn, DateColumn, TimeColumn);
-                }
-            }
-
-            fclose(activity);
-            fclose(temp);
-
-            remove("activity.csv");
-            rename("temp.csv", "activity.csv");
-
-            if (updated) {
-                printf("แก้ไขข้อมูลเรียบร้อย!\n");
-            } else {
-                printf("ไม่พบชื่อที่ต้องการแก้ไข\n");
-            }
-            break;
-
-    // DELETE
-        case 4:
-            printf("\n---- ลบข้อมูลการเข้าร่วมกิจกรรม ----\n");
-            printf("กรอกชื่อผู้เข้าร่วมที่ต้องการลบ: ");
-            scanf(" %[^\n]", deleteName);   
-
-            printf("คุณต้องการลบข้อมูลของ \"%s\" ใช่หรือไม่? (y/n): ", deleteName);
-            scanf(" %c", &confirm);
-
-            if (confirm != 'y' && confirm != 'Y') {
-                printf("ยกเลิกการลบข้อมูล\n");
-                break;
-            }
-
-            temp = fopen("temp.csv", "w");
-            activity = fopen("activity.csv", "r");
-
-            if (activity == NULL || temp == NULL) {
-                printf("ไม่สามารถเปิดไฟล์ได้\n");
-                break;
-            }
-
-            if (fgets(line, sizeof(line), activity)) {
-                fprintf(temp, "%s", line);
-            }
-
-            deleted = 0;
-            while (fgets(line, sizeof(line), activity)) {
-                line[strcspn(line, "\n")] = 0;
-
-                NameColumn     = strtok(line, ",");
-                ActivityColumn = strtok(NULL, ",");
-                DateColumn     = strtok(NULL, ",");
-                TimeColumn     = strtok(NULL, ",");
-
-                if (NameColumn && strcmp(NameColumn, deleteName) != 0) {
-                    fprintf(temp, "%s,%s,%s,%s\n",
-                            NameColumn, ActivityColumn, DateColumn, TimeColumn);
-                } else {
-                    deleted = 1;
-                }
-            }
-
-            fclose(activity);
-            fclose(temp);
-
-            remove("activity.csv");
-            rename("temp.csv", "activity.csv");
-
-            if (deleted) {
-                printf("ลบข้อมูลของ \"%s\" เรียบร้อย!\n", deleteName);
-            } else {
-                printf("ไม่พบชื่อที่ต้องการลบ\n");
-            }
-            break;
+    printf("\n---- ผลการค้นหา ----\n");
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, keyword)) {
+            printf("%s", line);
         }
-        
-    } 
+    }
 
+    printf("\nกรอก ID ที่ต้องการแก้ไข: ");
+    scanf("%s", id);
+
+    rewind(fp);
+    while (fgets(line, sizeof(line), fp)) {
+        char fileId[10], name[100], activity[100], date[20], time[20];
+        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%s", fileId, name, activity, date, time);
+
+        if (strcmp(fileId, id) == 0) {
+            found = 1;
+            int choice;
+            printf("เลือกสิ่งที่ต้องการแก้ไข:\n");
+            printf("1. ชื่อ\n2. กิจกรรม\n3. วันที่/เดือน/ปี\n4. เวลา\n");
+            printf("เลือก: ");
+            scanf("%d", &choice);
+
+            if (choice == 1) {
+                printf("ชื่อใหม่: ");
+                scanf(" %[^\n]", name);
+            } else if (choice == 2) {
+                printf("กิจกรรมใหม่: ");
+                scanf(" %[^\n]", activity);
+            } else if (choice == 3) {
+                int day, month, year;
+                do {
+                    printf("เดือน (1-12): ");
+                    scanf("%d", &month);
+                    if (month < 1 || month > 12)
+                        printf("เดือนต้องอยู่ระหว่าง 1 ถึง 12!\n");
+                } while (month < 1 || month > 12);
+
+                int maxDay = getMaxDays(month);
+                do {
+                    printf("วัน (1-%d): ", maxDay);
+                    scanf("%d", &day);
+                    if (day < 1 || day > maxDay)
+                        printf("วันต้องอยู่ระหว่าง 1 ถึง %d!\n", maxDay);
+                } while (day < 1 || day > maxDay);
+
+                printf("ปี: ");
+                scanf("%d", &year);
+                sprintf(date, "%02d/%02d/%04d", day, month, year);
+            } else if (choice == 4) {
+                int hour, minute;
+                printf("เวลาใหม่ (ชั่วโมง นาที): ");
+                scanf("%d %d", &hour, &minute);
+                sprintf(time, "%02d:%02d", hour, minute);
+            }
+
+            fprintf(temp, "%s,%s,%s,%s,%s\n", fileId, name, activity, date, time);
+        } else {
+            fprintf(temp, "%s", line);
+        }
+    }
+
+    fclose(fp);
+    fclose(temp);
+    remove(FILE_NAME);
+    rename("temp.csv", FILE_NAME);
+
+    if (found)
+        printf("แก้ไขข้อมูลเรียบร้อย!\n");
+    else
+        printf("ไม่พบข้อมูลที่ต้องการแก้ไข!\n");
+}
+
+// ลบข้อมูล
+void deleteRecord() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    FILE *temp = fopen("temp.csv", "w");
+    char line[256], id[10], keyword[100];
+    int found = 0;
+
+    if (fp == NULL || temp == NULL) {
+        printf("ไม่สามารถเปิดไฟล์ได้\n");
+        return;
+    }
+
+    printf("กรอกคำค้นหา (ชื่อหรือกิจกรรม): ");
+    scanf(" %[^\n]", keyword);
+
+    printf("\n---- ผลการค้นหา ----\n");
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, keyword)) {
+            printf("%s", line);
+        }
+    }
+
+    printf("\nกรอก ID ที่ต้องการลบ: ");
+    scanf("%s", id);
+
+    rewind(fp);
+    while (fgets(line, sizeof(line), fp)) {
+        char fileId[10];
+        sscanf(line, "%[^,]", fileId);
+
+        if (strcmp(fileId, id) == 0) {
+            found = 1;
+            continue;
+        }
+        fprintf(temp, "%s", line);
+    }
+
+    fclose(fp);
+    fclose(temp);
+    remove(FILE_NAME);
+    rename("temp.csv", FILE_NAME);
+
+    if (found)
+        printf("ลบข้อมูลเรียบร้อย!\n");
+    else
+        printf("ไม่พบข้อมูลที่ต้องการลบ!\n");
+}
+
+int main() {
+    int choice;
+    int running = 1; // ตัวแปรควบคุม loop
+
+    while (running) {
+        printf("\n---------- ระบบจัดการข้อมูลผู้เข้าร่วมกิจกรรม ----------\n");
+        printf("1. แสดงข้อมูลทั้งหมด\n");
+        printf("2. เพิ่มข้อมูล\n");
+        printf("3. ค้นหาข้อมูล\n");
+        printf("4. แก้ไขข้อมูล\n");
+        printf("5. ลบข้อมูล\n");
+        printf("6. ออก\n");
+        printf("เลือก: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1: viewAll(); break;
+            case 2: addRecord(); break;
+            case 3: searchRecord(); break;
+            case 4: updateRecord(); break;
+            case 5: deleteRecord(); break;
+            case 6: 
+                printf("ออกจากโปรแกรมแล้วครับ!\n");
+                running = 0;
+                break;
+            default:
+                printf("กรุณาเลือกใหม่!\n");
+        }
+    }
     return 0;
 }
