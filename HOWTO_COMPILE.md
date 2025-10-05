@@ -12,12 +12,13 @@
 ````markdown
 
 ## ⚙️ วิธีคอมไพล์และรันโปรแกรม
----
+
 
 1. **ตรวจสอบว่าได้ติดตั้ง GCC แล้ว**  
    เปิด Command Prompt แล้วพิมพ์คำสั่ง:
    ```bash
    gcc --version
+   ```
 ````
 
 หากยังไม่มี ให้ติดตั้งผ่าน [MinGW](https://sourceforge.net/projects/mingw/) หรือ [TDM-GCC](https://jmeubank.github.io/tdm-gcc/)
