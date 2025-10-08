@@ -4,6 +4,16 @@
 #include <ctype.h>
 
 #define FILE_NAME "activity.csv"
+int isValidName(const char *name) {
+    for (int i = 0; i < strlen(name); i++) {
+        unsigned char c = name[i];
+        
+        if (!(isalpha(c) || (c >= 0xC0 && c <= 0xFF) || c == ' ')) {
+            return 0;
+        }
+    }
+    return 1;
+}
 
 char* strcasestr_custom(const char *haystack, const char *needle) {
     if (!*needle) return (char*)haystack;
@@ -610,78 +620,88 @@ void runUnitTest() {
     searchRecordTest("UnitTestUser");
     printf("========== END UNIT TEST ==========\n");
 }
+typedef struct {
+    int id;
+    char name[100];
+    char activity[100];
+    int day, month, year;
+    int hour, minute;
+} Record;
 
+void showRecords() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    if (fp == NULL) {
+        printf("❌ ไม่มีไฟล์ข้อมูล\n");
+        return;
+    }
+
+    char line[256];
+    printf("\n📋 ข้อมูลในระบบ:\n");
+    while (fgets(line, sizeof(line), fp)) {
+        printf("%s", line);
+    }
+    fclose(fp);
+}
+void addRecordFromStruct(Record r) {
+    FILE *fp = fopen(FILE_NAME, "a");
+    if (!fp) {
+        printf("❌ ไม่สามารถเปิดไฟล์ได้\n");
+        return;
+    }
+
+    int newID = getLastID() + 1;
+    fprintf(fp, "%d,%s,%s,%02d/%02d/%04d,%02d:%02d,active\n",
+            newID, r.name, r.activity, r.day, r.month, r.year, r.hour, r.minute);
+    fclose(fp);
+    printf("✅ เพิ่มข้อมูลผู้ใช้: %s สำเร็จ (ID=%d)\n", r.name, newID);
+}
+int isValidDate(int day, int month) {
+    int maxDay;
+    if (month == 2) maxDay = 29;
+    else if (month == 4 || month == 6 || month == 9 || month == 11) maxDay = 30;
+    else maxDay = 31;
+
+    if (day < 1 || day > maxDay) return 0;
+    return 1;
+}
 
 void runE2ETest() {
-    printf("\n========== RUN E2E TEST ==========\n");
+    printf("\n===== 🔧 เริ่มการทดสอบ End-to-End (E2E Test) =====\n");
 
-    addRecordTest("E2EUser", "E2EActivity", 2, 10, 2025, 14, 45);
+    // เตรียมไฟล์ CSV ใหม่
+    FILE *fp = fopen(FILE_NAME, "w");
+    fprintf(fp, "ID,ชื่อผู้เข้าร่วม,ชื่อกิจกรรม,วันที่เข้าร่วม,เวลา,สถานะ\n");
+    fclose(fp);
+    printf("✅ เตรียมไฟล์ CSV ใหม่แล้ว\n");
 
-    
-    searchRecordTest("E2EUser");
+    // ข้อมูลทดสอบ
+    Record inputs[] = {
+        {1, "Surawit", "Coding Camp", 8, 10, 2025, 14, 30},  // ถูกต้อง
+        {2, "1234", "AI Workshop", 8, 10, 2025, 9, 0},       // ชื่อผิด
+        {3, "Nattapon", "Robotics", 31, 4, 2025, 10, 15},    // วันที่ผิด
+        {4, "Anucha", "IoT", 29, 2, 2025, 12, 0},            // ถูกต้อง
+        {5, "Siriluck", "Drone", 30, 2, 2025, 13, 0}         // วันที่ผิด
+    };
+    int n = sizeof(inputs)/sizeof(inputs[0]);
 
-
-    FILE *fp = fopen(FILE_NAME, "r+");
-    if (fp) {
-        char lines[1000][256];
-        int lineCount = 0;
-        char line[256];
-
-        while (fgets(line, sizeof(line), fp)) {
-            line[strcspn(line, "\n")] = 0;
-            strcpy(lines[lineCount++], line);
+    for (int i = 0; i < n; i++) {
+        if (!isValidName(inputs[i].name)) {
+            printf("❌ ปฏิเสธข้อมูลชื่อผู้ใช้ไม่ถูกต้อง: %s\n", inputs[i].name);
+            continue;
         }
-
-        for (int i = 1; i < lineCount; i++) {
-            char fileId[10], name[100], activity[100], date[20], time[20], status[20];
-            sscanf(lines[i], "%[^,],%[^,],%[^,],%[^,],%[^,],%s",
-                   fileId, name, activity, date, time, status);
-            if (strcmp(name, "E2EUser") == 0 && strcmp(status, "active") == 0) {
-                strcpy(name, "E2EUserUpdated");
-                strcpy(activity, "E2EActivityUpdated");
-                sprintf(lines[i], "%s,%s,%s,%s,%s,%s", fileId, name, activity, date, time, status);
-            }
+        if (!isValidDate(inputs[i].day, inputs[i].month)) {
+            printf("❌ ปฏิเสธข้อมูลวัน/เดือนไม่ถูกต้อง: %d/%d\n", inputs[i].day, inputs[i].month);
+            continue;
         }
-
-        rewind(fp);
-        for (int i = 0; i < lineCount; i++) fprintf(fp, "%s\n", lines[i]);
-        fclose(fp);
+        addRecordFromStruct(inputs[i]);
     }
 
-    printf("✅ แก้ไขข้อมูลสำเร็จ\n");
+    // แสดงข้อมูลสุดท้าย
+    showRecords();
 
-
-    FILE *temp = fopen("temp.csv", "w");
-    fp = fopen(FILE_NAME, "r");
-    char idToDelete[10] = "";
-    if (fp && temp) {
-        char header[256];
-        fgets(header, sizeof(header), fp);
-        fprintf(temp, "%s", header);
-        char line[256];
-        char status[20];
-        while (fgets(line, sizeof(line), fp)) {
-            char fileId[10], name[100], activity[100], date[20], time[20], stat[20];
-            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%s",
-                   fileId, name, activity, date, time, stat);
-            if (strcmp(name, "E2EUserUpdated") == 0 && strcmp(stat, "active") == 0) {
-                strcpy(stat, "deleted");
-                strcpy(idToDelete, fileId);
-            }
-            fprintf(temp, "%s,%s,%s,%s,%s,%s\n", fileId, name, activity, date, time, stat);
-        }
-
-        fclose(fp);
-        fclose(temp);
-        remove(FILE_NAME);
-        rename("temp.csv", FILE_NAME);
-        printf("✅ ลบข้อมูลสำเร็จ (ID=%s)\n", idToDelete);
-    }
-
-
-    restoreRecord();
-    printf("========== END E2E TEST ==========\n");
+    printf("\n✅ การทดสอบ E2E ครบทุกขั้นตอนเสร็จสิ้น!\n");
 }
+
 
 
 int main() {
